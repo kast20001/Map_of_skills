@@ -1,527 +1,472 @@
 <!DOCTYPE html>
 <html lang="ru">
 <head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
-<title>3D Куб навыков</title>
-
-<style>
-    body {
-        margin: 0;
-        overflow: hidden;
-        touch-action: none;
-        font-family: 'Segoe UI', sans-serif;
-        background: #050b1a;
-    }
-
-    #info {
-        position: absolute;
-        top: 20px;
-        left: 20px;
-        z-index: 10;
-        background: rgba(0,0,0,0.75);
-        color: white;
-        padding: 12px 18px;
-        border-radius: 10px;
-        border-left: 4px solid #ffaa00;
-        backdrop-filter: blur(5px);
-        font-size: 14px;
-    }
-
-    .face-panel {
-        cursor: pointer;
-        transition: transform 0.2s ease, filter 0.2s ease;
-    }
-
-    .face-panel:hover {
-        transform: scale(1.02);
-        filter: brightness(1.1);
-    }
-</style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>3D Карта навыков Java/Python — интерактивный куб</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            touch-action: none; /* мобильные жесты не перехватываются браузером */
+            font-family: 'Segoe UI', 'Roboto', sans-serif;
+        }
+        #info {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            background: rgba(0,0,0,0.75);
+            color: white;
+            padding: 10px 18px;
+            border-radius: 8px;
+            pointer-events: none;
+            z-index: 10;
+            backdrop-filter: blur(5px);
+            font-size: 14px;
+            border-left: 4px solid #ff8800;
+        }
+        #controls-note {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            background: rgba(0,0,0,0.6);
+            color: #ccc;
+            padding: 5px 12px;
+            border-radius: 6px;
+            font-size: 12px;
+            pointer-events: none;
+            font-family: monospace;
+        }
+        /* Модальное окно */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.85);
+            backdrop-filter: blur(5px);
+            z-index: 1000;
+            display: none;
+            justify-content: center;
+            align-items: center;
+            font-family: 'Segoe UI', Roboto, sans-serif;
+        }
+        .modal-content {
+            background: linear-gradient(145deg, #0f172a, #0a0f1f);
+            border-radius: 28px;
+            max-width: 600px;
+            width: 85%;
+            max-height: 85vh;
+            overflow-y: auto;
+            border: 2px solid #ffaa44;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.5);
+            color: #f0f0f0;
+            padding: 24px;
+            position: relative;
+            animation: fadeInUp 0.3s ease;
+        }
+        @keyframes fadeInUp {
+            from { opacity: 0; transform: translateY(30px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .modal-content h2 {
+            margin-top: 0;
+            border-bottom: 2px solid #ffaa44;
+            display: inline-block;
+            padding-bottom: 8px;
+            font-size: 28px;
+        }
+        .modal-content .close-btn {
+            position: absolute;
+            top: 16px;
+            right: 20px;
+            background: none;
+            border: none;
+            color: #ffaa44;
+            font-size: 32px;
+            cursor: pointer;
+            transition: transform 0.2s;
+            font-weight: bold;
+        }
+        .modal-content .close-btn:hover {
+            transform: scale(1.2);
+            color: #ff6644;
+        }
+        .modal-list {
+            margin-top: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 18px;
+        }
+        .modal-item {
+            background: #1e293b80;
+            padding: 12px 16px;
+            border-radius: 16px;
+            border-left: 4px solid #ffaa44;
+        }
+        .modal-item strong {
+            font-size: 18px;
+            color: #ffdd99;
+            display: block;
+            margin-bottom: 6px;
+        }
+        .modal-item p {
+            margin: 0;
+            font-size: 14px;
+            line-height: 1.5;
+            color: #cbd5e6;
+        }
+        /* Стиль для кликабельных панелей */
+        .face-panel {
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+        .face-panel:hover {
+            filter: brightness(1.05);
+            box-shadow: 0 0 12px rgba(255,170,68,0.5);
+        }
+        @media (max-width: 600px) {
+            .modal-content { padding: 16px; width: 90%; }
+            .modal-item strong { font-size: 16px; }
+        }
+    </style>
 </head>
-
 <body>
-
-<div id="info">
-    <strong>📊 3D Матрица навыков</strong><br>
-    🖱️ ЛКМ — вращение<br>
-    🔍 Колёсико — zoom<br>
-    ✋ ПКМ — панорама
-</div>
-
-<script type="importmap">
-{
-    "imports": {
-        "three": "https://unpkg.com/three@r128/build/three.module.js",
-        "three/addons/": "https://unpkg.com/three@r128/examples/jsm/"
-    }
-}
-</script>
-
-<script type="module">
-
-import * as THREE from 'three';
-
-import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
-
-import {
-    CSS2DRenderer,
-    CSS2DObject
-} from 'three/addons/renderers/CSS2DRenderer.js';
-
-
-// --------------------------------------------------
-// SCENE
-// --------------------------------------------------
-
-const scene = new THREE.Scene();
-
-scene.background = new THREE.Color(0x050b1a);
-
-scene.fog = new THREE.FogExp2(0x050b1a, 0.01);
-
-
-// --------------------------------------------------
-// CAMERA
-// --------------------------------------------------
-
-const camera = new THREE.PerspectiveCamera(
-    45,
-    window.innerWidth / window.innerHeight,
-    0.1,
-    1000
-);
-
-camera.position.set(4, 3, 5);
-
-
-// --------------------------------------------------
-// RENDERER
-// --------------------------------------------------
-
-const renderer = new THREE.WebGLRenderer({
-    antialias: true
-});
-
-renderer.setPixelRatio(window.devicePixelRatio);
-
-renderer.setSize(
-    window.innerWidth,
-    window.innerHeight
-);
-
-renderer.shadowMap.enabled = true;
-
-document.body.appendChild(renderer.domElement);
-
-
-// --------------------------------------------------
-// LABEL RENDERER
-// --------------------------------------------------
-
-const labelRenderer = new CSS2DRenderer();
-
-labelRenderer.setSize(
-    window.innerWidth,
-    window.innerHeight
-);
-
-labelRenderer.domElement.style.position = 'absolute';
-labelRenderer.domElement.style.top = '0';
-labelRenderer.domElement.style.pointerEvents = 'none';
-
-document.body.appendChild(labelRenderer.domElement);
-
-
-// --------------------------------------------------
-// LIGHTS
-// --------------------------------------------------
-
-const ambientLight = new THREE.AmbientLight(
-    0xffffff,
-    0.6
-);
-
-scene.add(ambientLight);
-
-
-const directionalLight = new THREE.DirectionalLight(
-    0xffffff,
-    1
-);
-
-directionalLight.position.set(5, 5, 5);
-
-scene.add(directionalLight);
-
-
-const blueLight = new THREE.PointLight(
-    0x4488ff,
-    0.6
-);
-
-blueLight.position.set(-5, 2, -5);
-
-scene.add(blueLight);
-
-
-// --------------------------------------------------
-// STARS
-// --------------------------------------------------
-
-const starsGeometry = new THREE.BufferGeometry();
-
-const starCount = 1200;
-
-const positions = new Float32Array(starCount * 3);
-
-for (let i = 0; i < starCount; i++) {
-
-    positions[i * 3] = (Math.random() - 0.5) * 150;
-    positions[i * 3 + 1] = (Math.random() - 0.5) * 150;
-    positions[i * 3 + 2] = (Math.random() - 0.5) * 150;
-}
-
-starsGeometry.setAttribute(
-    'position',
-    new THREE.BufferAttribute(positions, 3)
-);
-
-const starsMaterial = new THREE.PointsMaterial({
-    color: 0xffffff,
-    size: 0.08,
-    transparent: true,
-    opacity: 0.7
-});
-
-const stars = new THREE.Points(
-    starsGeometry,
-    starsMaterial
-);
-
-scene.add(stars);
-
-
-// --------------------------------------------------
-// CUBE
-// --------------------------------------------------
-
-const cubeGroup = new THREE.Group();
-
-scene.add(cubeGroup);
-
-
-const cubeGeometry = new THREE.BoxGeometry(
-    3,
-    3,
-    3
-);
-
-const cubeMaterial = new THREE.MeshPhongMaterial({
-    color: 0x2266aa,
-    transparent: true,
-    opacity: 0.08,
-    side: THREE.DoubleSide
-});
-
-const cube = new THREE.Mesh(
-    cubeGeometry,
-    cubeMaterial
-);
-
-cubeGroup.add(cube);
-
-
-// --------------------------------------------------
-// WIREFRAME
-// --------------------------------------------------
-
-const edges = new THREE.EdgesGeometry(cubeGeometry);
-
-const wireframe = new THREE.LineSegments(
-    edges,
-    new THREE.LineBasicMaterial({
-        color: 0x66ccff
-    })
-);
-
-cubeGroup.add(wireframe);
-
-
-// --------------------------------------------------
-// PANEL CREATOR
-// --------------------------------------------------
-
-function createPanel(title, color) {
-
-    const div = document.createElement('div');
-
-    div.className = 'face-panel';
-
-    div.style.width = '260px';
-    div.style.height = '260px';
-
-    div.style.background = 'rgba(15,20,40,0.92)';
-    div.style.border = `2px solid ${color}`;
-    div.style.borderRadius = '18px';
-
-    div.style.backdropFilter = 'blur(8px)';
-    div.style.boxShadow = '0 10px 25px rgba(0,0,0,0.45)';
-
-    div.style.padding = '16px';
-    div.style.color = 'white';
-
-    div.innerHTML = `
-        <h2 style="
-            margin-top:0;
-            color:${color};
-            border-bottom:1px solid ${color};
-            padding-bottom:8px;
-        ">
-            ${title}
-        </h2>
-
-        <p>• Java / Python</p>
-        <p>• Docker / Kubernetes</p>
-        <p>• AI Tools</p>
-        <p>• PostgreSQL</p>
-        <p>• CI/CD</p>
-        <p>• System Design</p>
-    `;
-
-    return new CSS2DObject(div);
-}
-
-
-// --------------------------------------------------
-// PANELS
-// --------------------------------------------------
-
-const front = createPanel(
-    '🟢 Junior',
-    '#88ff88'
-);
-
-front.position.set(0, 0, 1.7);
-
-cubeGroup.add(front);
-
-
-const back = createPanel(
-    '🔵 Middle',
-    '#88aaff'
-);
-
-back.position.set(0, 0, -1.7);
-
-back.rotation.y = Math.PI;
-
-cubeGroup.add(back);
-
-
-const left = createPanel(
-    '🔴 Senior',
-    '#ff8888'
-);
-
-left.position.set(-1.7, 0, 0);
-
-left.rotation.y = -Math.PI / 2;
-
-cubeGroup.add(left);
-
-
-const right = createPanel(
-    '🛠️ Stack',
-    '#ffaa66'
-);
-
-right.position.set(1.7, 0, 0);
-
-right.rotation.y = Math.PI / 2;
-
-cubeGroup.add(right);
-
-
-const topPanel = createPanel(
-    '🧠 Soft Skills',
-    '#dd88ff'
-);
-
-topPanel.position.set(0, 1.7, 0);
-
-topPanel.rotation.x = Math.PI / 2;
-
-cubeGroup.add(topPanel);
-
-
-const bottomPanel = createPanel(
-    '📈 Metrics',
-    '#66ffcc'
-);
-
-bottomPanel.position.set(0, -1.7, 0);
-
-bottomPanel.rotation.x = -Math.PI / 2;
-
-cubeGroup.add(bottomPanel);
-
-
-// --------------------------------------------------
-// PARTICLES RING
-// --------------------------------------------------
-
-const ringGeometry = new THREE.BufferGeometry();
-
-const ringCount = 600;
-
-const ringPositions = [];
-
-for (let i = 0; i < ringCount; i++) {
-
-    const theta = Math.random() * Math.PI * 2;
-
-    const phi = Math.acos(2 * Math.random() - 1);
-
-    const radius = 2.5;
-
-    ringPositions.push(
-        radius * Math.sin(phi) * Math.cos(theta),
-        radius * Math.sin(phi) * Math.sin(theta),
-        radius * Math.cos(phi)
-    );
-}
-
-ringGeometry.setAttribute(
-    'position',
-    new THREE.Float32BufferAttribute(
-        ringPositions,
-        3
-    )
-);
-
-const ringMaterial = new THREE.PointsMaterial({
-    color: 0x77aaff,
-    size: 0.03,
-    transparent: true,
-    opacity: 0.5
-});
-
-const ringParticles = new THREE.Points(
-    ringGeometry,
-    ringMaterial
-);
-
-scene.add(ringParticles);
-
-
-// --------------------------------------------------
-// CONTROLS
-// --------------------------------------------------
-
-const controls = new OrbitControls(
-    camera,
-    renderer.domElement
-);
-
-
-// Плавность
-controls.enableDamping = true;
-controls.dampingFactor = 0.08;
-
-
-// Вращение
-controls.enableRotate = true;
-controls.rotateSpeed = 0.9;
-
-
-// Zoom
-controls.enableZoom = true;
-controls.zoomSpeed = 1.0;
-
-
-// Ограничения zoom
-controls.minDistance = 3;
-controls.maxDistance = 12;
-
-
-// Панорама
-controls.enablePan = true;
-controls.panSpeed = 0.8;
-
-
-// Ограничения углов
-controls.minPolarAngle = 0.2;
-controls.maxPolarAngle = Math.PI - 0.2;
-
-
-// Центр
-controls.target.set(0, 0, 0);
-
-
-// Touch support
-controls.touches = {
-    ONE: THREE.TOUCH.ROTATE,
-    TWO: THREE.TOUCH.DOLLY_PAN
-};
-
-
-// --------------------------------------------------
-// RESIZE
-// --------------------------------------------------
-
-window.addEventListener(
-    'resize',
-    onWindowResize
-);
-
-function onWindowResize() {
-
-    camera.aspect =
-        window.innerWidth / window.innerHeight;
-
-    camera.updateProjectionMatrix();
-
-    renderer.setSize(
-        window.innerWidth,
-        window.innerHeight
-    );
-
-    labelRenderer.setSize(
-        window.innerWidth,
-        window.innerHeight
-    );
-}
-
-
-// --------------------------------------------------
-// ANIMATION
-// --------------------------------------------------
-
-let time = 0;
-
-function animate() {
-
-    requestAnimationFrame(animate);
-
-    time += 0.005;
-
-    ringParticles.rotation.y += 0.001;
-
-    stars.rotation.y += 0.0002;
-
-    cubeGroup.rotation.y += 0.0005;
-
-    controls.update();
-
-    renderer.render(scene, camera);
-
-    labelRenderer.render(scene, camera);
-}
-
-animate();
-
-</script>
-
+    <div id="info">
+        <strong>📊 3D Матрица навыков</strong> | Java • Python | <span style="color:#ffaa00;">Кликните на любую грань — детали</span><br>
+        🖱️ <em>Перетащите мышью, чтобы вращать куб</em>
+    </div>
+    <div id="controls-note">
+        🔄 ЛКМ — вращение | ПКМ — панорама | Колёсико — масштаб | 👆 Клик по панели — полная информация
+    </div>
+
+    <!-- Модальное окно -->
+    <div id="modal" class="modal-overlay">
+        <div class="modal-content">
+            <button class="close-btn" id="closeModalBtn">&times;</button>
+            <h2 id="modalTitle">Название панели</h2>
+            <div id="modalList" class="modal-list"></div>
+        </div>
+    </div>
+
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://unpkg.com/three@r128/build/three.module.js",
+                "three/addons/": "https://unpkg.com/three@r128/examples/jsm/"
+            }
+        }
+    </script>
+
+    <script type="module">
+        import * as THREE from 'three';
+        import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+        import { CSS2DRenderer, CSS2DObject } from 'three/addons/renderers/CSS2DRenderer.js';
+
+        // --- Сцена, камера, рендереры ---
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x050b1a);
+        scene.fog = new THREE.FogExp2(0x050b1a, 0.008);
+
+        // Камера: немного дальше, чтобы панели (220x220) помещались
+        const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
+        camera.position.set(5, 4, 6);
+        camera.lookAt(0, 0, 0);
+
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setPixelRatio(window.devicePixelRatio); // чёткость на Retina
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.shadowMap.enabled = true;
+        document.body.appendChild(renderer.domElement);
+
+        const labelRenderer = new CSS2DRenderer();
+        labelRenderer.setSize(window.innerWidth, window.innerHeight);
+        labelRenderer.domElement.style.position = 'absolute';
+        labelRenderer.domElement.style.top = '0px';
+        labelRenderer.domElement.style.left = '0px';
+        labelRenderer.domElement.style.pointerEvents = 'auto'; // чтобы клики по панелям работали
+        document.body.appendChild(labelRenderer.domElement);
+
+        // --- Освещение ---
+        const ambientLight = new THREE.AmbientLight(0x404060);
+        scene.add(ambientLight);
+        const dirLight = new THREE.DirectionalLight(0xffffff, 1);
+        dirLight.position.set(2, 5, 3);
+        scene.add(dirLight);
+        const backLight = new THREE.PointLight(0x4466cc, 0.4);
+        backLight.position.set(-2, 1, -3);
+        scene.add(backLight);
+        const fillLight = new THREE.PointLight(0xffaa66, 0.3);
+        fillLight.position.set(1, -2, 1);
+        scene.add(fillLight);
+
+        // --- Звёздный фон ---
+        const starGeometry = new THREE.BufferGeometry();
+        const starCount = 1200;
+        const starPositions = new Float32Array(starCount * 3);
+        for (let i = 0; i < starCount; i++) {
+            starPositions[i*3] = (Math.random() - 0.5) * 200;
+            starPositions[i*3+1] = (Math.random() - 0.5) * 100;
+            starPositions[i*3+2] = (Math.random() - 0.5) * 80 - 40;
+        }
+        starGeometry.setAttribute('position', new THREE.BufferAttribute(starPositions, 3));
+        const stars = new THREE.Points(starGeometry, new THREE.PointsMaterial({ color: 0xffffff, size: 0.08, transparent: true, opacity: 0.6 }));
+        scene.add(stars);
+
+        // --- Пол-сетка (для ориентации) ---
+        const gridHelper = new THREE.GridHelper(10, 20, 0x88aaff, 0x335588);
+        gridHelper.position.y = -1.8;
+        gridHelper.material.transparent = true;
+        gridHelper.material.opacity = 0.25;
+        scene.add(gridHelper);
+
+        // --- Модальное окно (логика) ---
+        const modal = document.getElementById('modal');
+        const modalTitle = document.getElementById('modalTitle');
+        const modalList = document.getElementById('modalList');
+        const closeModalBtn = document.getElementById('closeModalBtn');
+
+        function openModal(title, itemsArray) {
+            modalTitle.textContent = title;
+            modalList.innerHTML = '';
+            itemsArray.forEach(item => {
+                const div = document.createElement('div');
+                div.className = 'modal-item';
+                if (typeof item === 'string') {
+                    div.innerHTML = `<strong>📄</strong><p>${item}</p>`;
+                } else {
+                    div.innerHTML = `<strong>${item.name}</strong><p>${item.desc || ''}</p>`;
+                }
+                modalList.appendChild(div);
+            });
+            modal.style.display = 'flex';
+        }
+
+        function closeModal() {
+            modal.style.display = 'none';
+        }
+        closeModalBtn.addEventListener('click', closeModal);
+        modal.addEventListener('click', (e) => {
+            if (e.target === modal) closeModal();
+        });
+
+        // --- Функция создания кликабельной панели (CSS2D) ---
+        function createFacePanel(title, items, accentColor = '#ffaa44') {
+            const div = document.createElement('div');
+            div.className = 'face-panel';
+            div.style.backgroundColor = 'rgba(20, 25, 45, 0.92)';
+            div.style.backdropFilter = 'blur(8px)';
+            div.style.borderRadius = '16px';
+            div.style.border = `2px solid ${accentColor}`;
+            div.style.boxShadow = '0 8px 20px rgba(0,0,0,0.5)';
+            div.style.padding = '12px 10px';
+            div.style.width = '220px';   // уменьшили с 280px для лучшего обзора
+            div.style.height = '220px';
+            div.style.color = '#f0f0f0';
+            div.style.fontSize = '12px';
+            div.style.overflowY = 'auto';
+            div.style.display = 'flex';
+            div.style.flexDirection = 'column';
+            div.style.transition = 'all 0.1s';
+
+            const header = document.createElement('div');
+            header.style.fontSize = '18px';
+            header.style.fontWeight = 'bold';
+            header.style.borderBottom = `2px solid ${accentColor}`;
+            header.style.marginBottom = '10px';
+            header.style.paddingBottom = '6px';
+            header.style.display = 'flex';
+            header.style.alignItems = 'center';
+            header.style.gap = '8px';
+            header.innerHTML = `<span style="font-size:22px;">📌</span> ${title}`;
+            div.appendChild(header);
+
+            // Краткое содержимое (первые 3-4 элемента для превью)
+            const previewItems = items.slice(0, 4);
+            previewItems.forEach(item => {
+                const row = document.createElement('div');
+                row.style.marginBottom = '8px';
+                row.style.lineHeight = '1.3';
+                if (typeof item === 'string') {
+                    row.innerHTML = `<span style="color:${accentColor}; font-weight:500;">•</span> ${item.substring(0, 50)}${item.length > 50 ? '…' : ''}`;
+                } else {
+                    let shortDesc = item.desc ? (item.desc.length > 45 ? item.desc.substring(0, 45) + '…' : item.desc) : '';
+                    row.innerHTML = `<span style="color:${accentColor}; font-weight:600;">${item.name}</span><br><span style="font-size:10px; color:#bbbbee;">${shortDesc}</span>`;
+                }
+                div.appendChild(row);
+            });
+            // Добавляем индикатор "Подробнее..."
+            const moreHint = document.createElement('div');
+            moreHint.style.marginTop = '8px';
+            moreHint.style.fontSize = '10px';
+            moreHint.style.color = '#ffaa66';
+            moreHint.style.textAlign = 'center';
+            moreHint.innerHTML = '▼ кликните для полного списка ▼';
+            div.appendChild(moreHint);
+
+            div.addEventListener('click', (e) => {
+                e.stopPropagation();
+                openModal(title, items);
+            });
+
+            return new CSS2DObject(div);
+        }
+
+        // --- ПОЛНЫЕ ДАННЫЕ ДЛЯ КАЖДОЙ ГРАНИ (из вашей курсовой) ---
+        const juniorItems = [
+            { name: "🔹 Java Core / Python синтаксис", desc: "Multithreading, Collections / Asyncio, строгая типизация. Базовые алгоритмы." },
+            { name: "🔹 Git, CI/CD основы", desc: "GitHub Actions / GitLab CI, работа в команде через pull requests." },
+            { name: "🔹 Базы данных (SQL, PostgreSQL)", desc: "Написание сложных JOIN, индексы, транзакции." },
+            { name: "🔹 ИИ-инструменты", desc: "GitHub Copilot, ChatGPT, промпт-инжиниринг (критически важно для джуна в 2026)." },
+            { name: "🔹 ATS-оптимизация резюме", desc: "Ключевые слова: Spring, Django, Docker, SQL, чтобы пройти фильтры." },
+            { name: "🔹 Английский (Tech)", desc: "Чтение документации, базовое общение в чатах." }
+        ];
+        const middleItems = [
+            { name: "⚙️ Архитектура и паттерны", desc: "Микросервисы, REST, gRPC, SOLID, CQRS, Event Sourcing." },
+            { name: "⚙️ Продвинутый ИИ", desc: "Fine-tuning LLM, RAG-приложения, интеграция AI API." },
+            { name: "⚙️ Контейнеризация", desc: "Docker, Docker Compose, Kubernetes (основы)." },
+            { name: "⚙️ Импортозамещение", desc: "Работа с Astra Linux, Postgres Pro, Ред ОС, Alt Linux." },
+            { name: "⚙️ Работа по ГПХ / ИП", desc: "Оформление самозанятости, налоги, договоры — рост 12% ИП в IT." },
+            { name: "⚙️ Тестирование", desc: "JUnit / pytest, интеграционное и модульное тестирование, TDD." }
+        ];
+        const seniorItems = [
+            { name: "🏆 Системный дизайн", desc: "HighLoad, отказоустойчивость, балансировка, кеширование (Redis)." },
+            { name: "🏆 Управление командой", desc: "Code review, менторство, OKR, найм, онбординг." },
+            { name: "🏆 Безопасность", desc: "OWASP Top 10, статический анализ кода, уязвимости." },
+            { name: "🏆 Стратегия ИИ", desc: "Внедрение AI в цикл разработки, оценка рисков." },
+            { name: "🏆 Бюджетирование", desc: "Оценка стоимости проектов, TCO, управление ресурсами." },
+            { name: "🏆 Переговоры с заказчиком", desc: "Технический sales, презентация решений, защита архитектуры." }
+        ];
+        const toolsItems = [
+            { name: "🛠️ Java-стек", desc: "Spring Boot, Hibernate, Maven/Gradle, Micronaut." },
+            { name: "🛠️ Python-стек", desc: "FastAPI/Django, Pandas, Celery, SQLAlchemy." },
+            { name: "🛠️ DevOps культура", desc: "Terraform, GitHub Actions, Ansible, мониторинг." },
+            { name: "🛠️ Базы данных", desc: "PostgreSQL, Redis, MongoDB, ClickHouse." },
+            { name: "🛠️ Message brokers", desc: "Kafka, RabbitMQ, NATS." },
+            { name: "🛠️ Мониторинг", desc: "Prometheus + Grafana, ELK стек." }
+        ];
+        const softTrends = [
+            { name: "🧠 Коммуникация", desc: "Работа в распределённых командах, синхронизация с product owner." },
+            { name: "🧠 Адаптивность", desc: "Смена стека, импортозамещение, быстрое обучение." },
+            { name: "🧠 Временной менеджмент", desc: "Agile/Scrum, Jira, тайм-менеджмент при удалёнке." },
+            { name: "📈 Тренд 2026", desc: "ИИ не заменит Senior, но автоматизирует 70% рутины джунов." },
+            { name: "📈 Серый рынок + ИП", desc: "Рост числа ИП в IT на 12% за год, переход на ГПХ." },
+            { name: "📈 Кризис Junior", desc: "HH-индекс >12 (до 23 резюме на вакансию), выживают только с доп. навыками." }
+        ];
+        const metricsItems = [
+            { name: "📊 HH-индекс (Java/Python)", desc: "Апрель 2026: 23 резюме на 1 вакансию (Junior), Middle — 7, Senior — 3." },
+            { name: "💰 Медианная з/п Middle", desc: "220-270 тыс. ₽ (стагнация с 2025, без роста)." },
+            { name: "🎯 Рекомендация", desc: "Джунам → Middle за 1-2 года, усилить ИИ, ATS-оптимизацию." },
+            { name: "🏁 Дефицит", desc: "Только Senior+ и Lead (их не хватает даже при кризисе)." },
+            { name: "⚠️ ATS фильтры", desc: "80% резюме отсекаются ботами, нужно адаптировать под каждую вакансию." },
+            { name: "✅ Карта навыков", desc: "Обновлять каждые 3 месяца, динамика требований растёт." }
+        ];
+
+        // Создаём панели
+        const panel1 = createFacePanel("🟢 Junior (2026)", juniorItems, "#88ff88");
+        const panel2 = createFacePanel("🔵 Middle", middleItems, "#88aaff");
+        const panel3 = createFacePanel("🔴 Senior / Lead", seniorItems, "#ff8888");
+        const panel4 = createFacePanel("🛠️ Инструменты (Java/Python)", toolsItems, "#ffaa66");
+        const panel5 = createFacePanel("🧩 Soft Skills & Тренды", softTrends, "#dd88ff");
+        const panel6 = createFacePanel("📈 Метрики & Выводы", metricsItems, "#66ffcc");
+
+        // Группируем все панели в одну группу, чтобы они вращались вместе с кубом
+        const cubeGroup = new THREE.Group();
+        scene.add(cubeGroup);
+
+        // Позиционирование на гранях куба
+        const radius = 1.55; // расстояние от центра (чтобы панели не врезались в рёбра)
+        panel1.position.set(0, 0, radius);
+        panel2.position.set(0, 0, -radius);
+        panel3.position.set(-radius, 0, 0);
+        panel4.position.set(radius, 0, 0);
+        panel5.position.set(0, radius, 0);
+        panel6.position.set(0, -radius, 0);
+
+        // Повороты для правильной ориентации
+        panel2.rotation.y = Math.PI;
+        panel3.rotation.y = -Math.PI / 2;
+        panel4.rotation.y = Math.PI / 2;
+        panel5.rotation.x = Math.PI / 2;
+        panel6.rotation.x = -Math.PI / 2;
+
+        cubeGroup.add(panel1);
+        cubeGroup.add(panel2);
+        cubeGroup.add(panel3);
+        cubeGroup.add(panel4);
+        cubeGroup.add(panel5);
+        cubeGroup.add(panel6);
+
+        // Декоративный прозрачный куб и рёбра (для визуального контура)
+        const boxGeometry = new THREE.BoxGeometry(2.9, 2.9, 2.9);
+        const edgesGeo = new THREE.EdgesGeometry(boxGeometry);
+        const wireframeMat = new THREE.LineBasicMaterial({ color: 0x66ccff });
+        const wireframe = new THREE.LineSegments(edgesGeo, wireframeMat);
+        cubeGroup.add(wireframe);
+        const transparentMat = new THREE.MeshPhongMaterial({ color: 0x2266aa, transparent: true, opacity: 0.07, side: THREE.DoubleSide });
+        const ghostCube = new THREE.Mesh(boxGeometry, transparentMat);
+        cubeGroup.add(ghostCube);
+
+        // --- Вращающиеся частицы вокруг куба ---
+        const particleRingGeometry = new THREE.BufferGeometry();
+        const ringCount = 800;
+        const ringPos = [];
+        for (let i = 0; i < ringCount; i++) {
+            const theta = Math.random() * Math.PI * 2;
+            const phi = Math.acos(2 * Math.random() - 1);
+            const r = 2.2;
+            ringPos.push(r * Math.sin(phi) * Math.cos(theta), r * Math.sin(phi) * Math.sin(theta), r * Math.cos(phi));
+        }
+        particleRingGeometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array(ringPos), 3));
+        const ringParticles = new THREE.Points(particleRingGeometry, new THREE.PointsMaterial({ color: 0x77aaff, size: 0.04, transparent: true, opacity: 0.5 }));
+        scene.add(ringParticles);
+
+        // --- OrbitControls (исправленные настройки) ---
+        const controls = new OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true;          // инерция
+        controls.dampingFactor = 0.08;
+        controls.enableRotate = true;
+        controls.rotateSpeed = 0.9;
+        controls.enableZoom = true;
+        controls.zoomSpeed = 1.0;
+        controls.minDistance = 3.5;             // чтобы камера не подходила слишком близко
+        controls.maxDistance = 12;
+        controls.enablePan = true;
+        controls.panSpeed = 0.8;
+        controls.minPolarAngle = 0.2;            // ограничение углов, чтобы не видеть пустоту
+        controls.maxPolarAngle = Math.PI - 0.2;
+        controls.target.set(0, 0, 0);
+        // Touch-управление для мобильных
+        controls.touches = {
+            ONE: THREE.TOUCH.ROTATE,
+            TWO: THREE.TOUCH.DOLLY_PAN
+        };
+
+        // --- Адаптация размера окна ---
+        window.addEventListener('resize', onWindowResize);
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            labelRenderer.setSize(window.innerWidth, window.innerHeight);
+        }
+
+        // --- Анимация (без авто-вращения куба, только частицы и звёзды) ---
+        let time = 0;
+        function animate() {
+            requestAnimationFrame(animate);
+            time += 0.008;
+            // Плавное вращение частиц
+            ringParticles.rotation.y = time * 0.2;
+            ringParticles.rotation.x = Math.sin(time * 0.3) * 0.2;
+            stars.rotation.y += 0.0005;
+            // Обновляем controls (пользователь может вращать камеру)
+            controls.update();
+            renderer.render(scene, camera);
+            labelRenderer.render(scene, camera);
+        }
+        animate();
+    </script>
 </body>
 </html>
