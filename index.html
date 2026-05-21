@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <title>3D Карта навыков Java/Python — интерактивный куб</title>
     <style>
+        * { box-sizing: border-box; }
         body {
             margin: 0;
             overflow: hidden;
@@ -21,11 +22,12 @@
             padding: 10px 18px;
             border-radius: 8px;
             pointer-events: none;
-            z-index: 10;
+            z-index: 20;
             backdrop-filter: blur(5px);
             font-size: 14px;
             border-left: 4px solid #ff8800;
             max-width: calc(100% - 40px);
+            line-height: 1.4;
         }
         #controls-note {
             position: absolute;
@@ -38,15 +40,12 @@
             font-size: 12px;
             pointer-events: none;
             font-family: monospace;
-            z-index: 10;
+            z-index: 20;
         }
-        /* Модальное окно */
         .modal-overlay {
             position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
             background: rgba(0,0,0,0.85);
             backdrop-filter: blur(5px);
             z-index: 1000;
@@ -82,10 +81,8 @@
         }
         .modal-content .close-btn {
             position: absolute;
-            top: 16px;
-            right: 20px;
-            background: none;
-            border: none;
+            top: 16px; right: 20px;
+            background: none; border: none;
             color: #ffaa44;
             font-size: 32px;
             cursor: pointer;
@@ -93,6 +90,8 @@
             font-weight: bold;
             line-height: 1;
             padding: 0;
+            width: 32px; height: 32px;
+            display: flex; align-items: center; justify-content: center;
         }
         .modal-content .close-btn:hover {
             transform: scale(1.2);
@@ -122,33 +121,22 @@
             line-height: 1.5;
             color: #cbd5e6;
         }
-        /* Стиль для кликабельных панелей */
         .face-panel {
-            cursor: pointer;
+            cursor: grab;
             transition: all 0.2s ease;
             user-select: none;
             -webkit-user-select: none;
+            touch-action: manipulation;
         }
+        .face-panel:active { cursor: grabbing; }
         .face-panel:hover {
             filter: brightness(1.05);
             box-shadow: 0 0 12px rgba(255,170,68,0.5);
             transform: scale(1.02);
         }
-        .face-panel:active {
-            transform: scale(0.98);
-        }
-        /* Скроллбар для панелей */
-        .face-panel::-webkit-scrollbar {
-            width: 6px;
-        }
-        .face-panel::-webkit-scrollbar-track {
-            background: rgba(255,255,255,0.1);
-            border-radius: 3px;
-        }
-        .face-panel::-webkit-scrollbar-thumb {
-            background: #ffaa44;
-            border-radius: 3px;
-        }
+        .face-panel::-webkit-scrollbar { width: 6px; }
+        .face-panel::-webkit-scrollbar-track { background: rgba(255,255,255,0.1); border-radius: 3px; }
+        .face-panel::-webkit-scrollbar-thumb { background: #ffaa44; border-radius: 3px; }
         @media (max-width: 600px) {
             .modal-content { padding: 16px; width: 90%; }
             .modal-item strong { font-size: 16px; }
@@ -159,14 +147,13 @@
 </head>
 <body>
     <div id="info">
-        <strong>📊 3D Матрица навыков</strong> | Java • Python | <span style="color:#ffaa00;">Кликните на любую грань — детали</span><br>
-        🖱️ <em>Перетащите мышью, чтобы вращать куб</em>
+        <strong>📊 3D Матрица навыков</strong> | Java • Python<br>
+        <span style="color:#ffaa00;">👆 Кликните на грань — детали</span> | 🖱️ <em>Перетащите для вращения</em>
     </div>
     <div id="controls-note">
-        🔄 ЛКМ — вращение | ПКМ — панорама | Колёсико — масштаб | 👆 Клик по панели — полная информация
+        🔄 ЛКМ — вращение | 🖱️ Колёсико — масштаб | 👆 Клик по панели — информация
     </div>
 
-    <!-- Модальное окно -->
     <div id="modal" class="modal-overlay">
         <div class="modal-content">
             <button class="close-btn" id="closeModalBtn" aria-label="Закрыть">&times;</button>
@@ -189,88 +176,75 @@
         import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
         import { CSS2DRenderer, CSS2DObject } from 'three/addons/renderers/CSS2DRenderer.js';
 
-        // === Инициализация с проверкой ===
-        try {
-            init();
-        } catch (error) {
-            console.error('❌ Ошибка инициализации:', error);
-            document.body.innerHTML = `
-                <div style="color:white;padding:20px;font-family:sans-serif;">
-                    <h2>⚠️ Ошибка загрузки 3D-сцены</h2>
-                    <p>Проверьте подключение к интернету и попробуйте обновить страницу.</p>
-                    <p><small>${error.message}</small></p>
-                </div>
-            `;
-        }
+        // === Инициализация ===
+        init();
 
         function init() {
-            // --- Сцена, камера, рендереры ---
+            // --- Сцена ---
             const scene = new THREE.Scene();
             scene.background = new THREE.Color(0x050b1a);
             scene.fog = new THREE.FogExp2(0x050b1a, 0.008);
 
+            // --- Камера ---
             const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
             camera.position.set(5, 4, 6);
             camera.lookAt(0, 0, 0);
 
+            // --- WebGL Renderer ---
             const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
-            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2)); // Оптимизация для мобильных
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
             renderer.setSize(window.innerWidth, window.innerHeight);
             renderer.shadowMap.enabled = true;
-            renderer.outputColorSpace = THREE.SRGBColorSpace; // Исправление цветов
+            renderer.outputColorSpace = THREE.SRGBColorSpace;
+            // 🔥 ВАЖНО: канвас должен быть ниже labelRenderer по z-index
+            renderer.domElement.style.position = 'absolute';
+            renderer.domElement.style.top = '0';
+            renderer.domElement.style.left = '0';
+            renderer.domElement.style.zIndex = '1';
             document.body.appendChild(renderer.domElement);
 
+            // --- CSS2D Renderer для панелей ---
             const labelRenderer = new CSS2DRenderer();
             labelRenderer.setSize(window.innerWidth, window.innerHeight);
             labelRenderer.domElement.style.position = 'absolute';
             labelRenderer.domElement.style.top = '0px';
             labelRenderer.domElement.style.left = '0px';
-            labelRenderer.domElement.style.pointerEvents = 'auto';
-            labelRenderer.domElement.style.zIndex = '5'; // Поверх canvas, но под модальным окном
+            // 🔥 ГЛАВНОЕ ИСПРАВЛЕНИЕ: события проходят сквозь контейнер к canvas
+            labelRenderer.domElement.style.pointerEvents = 'none';
+            labelRenderer.domElement.style.zIndex = '5';
+            labelRenderer.domElement.style.userSelect = 'none';
             document.body.appendChild(labelRenderer.domElement);
 
             // --- Освещение ---
-            const ambientLight = new THREE.AmbientLight(0x404060, 0.6);
-            scene.add(ambientLight);
-            
+            scene.add(new THREE.AmbientLight(0x404060, 0.6));
             const dirLight = new THREE.DirectionalLight(0xffffff, 1);
             dirLight.position.set(2, 5, 3);
             dirLight.castShadow = true;
             scene.add(dirLight);
-            
-            const backLight = new THREE.PointLight(0x4466cc, 0.5);
-            backLight.position.set(-2, 1, -3);
-            scene.add(backLight);
-            
-            const fillLight = new THREE.PointLight(0xffaa66, 0.4);
-            fillLight.position.set(1, -2, 1);
-            scene.add(fillLight);
+            scene.add(new THREE.PointLight(0x4466cc, 0.5, 0, 2));
+            scene.add(new THREE.PointLight(0xffaa66, 0.4, 0, 2));
 
-            // --- Звёздный фон ---
-            const starGeometry = new THREE.BufferGeometry();
-            const starCount = 1200;
-            const starPositions = new Float32Array(starCount * 3);
-            for (let i = 0; i < starCount; i++) {
-                starPositions[i*3] = (Math.random() - 0.5) * 200;
-                starPositions[i*3+1] = (Math.random() - 0.5) * 100;
-                starPositions[i*3+2] = (Math.random() - 0.5) * 80 - 40;
+            // --- Звёзды ---
+            const starGeo = new THREE.BufferGeometry();
+            const starsCount = 1200;
+            const starsPos = new Float32Array(starsCount * 3);
+            for (let i = 0; i < starsCount; i++) {
+                starsPos[i*3] = (Math.random() - 0.5) * 200;
+                starsPos[i*3+1] = (Math.random() - 0.5) * 100;
+                starsPos[i*3+2] = (Math.random() - 0.5) * 80 - 40;
             }
-            starGeometry.setAttribute('position', new THREE.BufferAttribute(starPositions, 3));
-            const stars = new THREE.Points(starGeometry, new THREE.PointsMaterial({ 
-                color: 0xffffff, 
-                size: 0.08, 
-                transparent: true, 
-                opacity: 0.6,
-                sizeAttenuation: true 
+            starGeo.setAttribute('position', new THREE.BufferAttribute(starsPos, 3));
+            const stars = new THREE.Points(starGeo, new THREE.PointsMaterial({
+                color: 0xffffff, size: 0.08, transparent: true, opacity: 0.6, sizeAttenuation: true
             }));
             scene.add(stars);
 
-            // --- Пол-сетка ---
-            const gridHelper = new THREE.GridHelper(10, 20, 0x88aaff, 0x335588);
-            gridHelper.position.y = -1.8;
-            gridHelper.material.transparent = true;
-            gridHelper.material.opacity = 0.25;
-            scene.add(gridHelper);
+            // --- Сетка пола ---
+            const grid = new THREE.GridHelper(10, 20, 0x88aaff, 0x335588);
+            grid.position.y = -1.8;
+            grid.material.transparent = true;
+            grid.material.opacity = 0.25;
+            scene.add(grid);
 
             // === Модальное окно ===
             const modal = document.getElementById('modal');
@@ -278,126 +252,105 @@
             const modalList = document.getElementById('modalList');
             const closeModalBtn = document.getElementById('closeModalBtn');
 
-            function openModal(title, itemsArray) {
-                modalTitle.textContent = title;
-                modalList.innerHTML = '';
-                itemsArray.forEach(item => {
-                    const div = document.createElement('div');
-                    div.className = 'modal-item';
-                    if (typeof item === 'string') {
-                        div.innerHTML = `<strong>📄</strong><p>${escapeHtml(item)}</p>`;
-                    } else {
-                        const desc = item.desc ? escapeHtml(item.desc) : '';
-                        div.innerHTML = `<strong>${escapeHtml(item.name)}</strong><p>${desc}</p>`;
-                    }
-                    modalList.appendChild(div);
-                });
-                modal.style.display = 'flex';
-                document.body.style.overflow = 'hidden'; // Блокируем скролл страницы
-            }
-
-            function closeModal() {
-                modal.style.display = 'none';
-                document.body.style.overflow = '';
-            }
-            
-            // Экранирование HTML для защиты от XSS
             function escapeHtml(text) {
                 const div = document.createElement('div');
                 div.textContent = text;
                 return div.innerHTML;
             }
 
+            function openModal(title, items) {
+                modalTitle.textContent = title;
+                modalList.innerHTML = '';
+                items.forEach(item => {
+                    const div = document.createElement('div');
+                    div.className = 'modal-item';
+                    if (typeof item === 'string') {
+                        div.innerHTML = `<strong>📄</strong><p>${escapeHtml(item)}</p>`;
+                    } else {
+                        div.innerHTML = `<strong>${escapeHtml(item.name)}</strong><p>${escapeHtml(item.desc || '')}</p>`;
+                    }
+                    modalList.appendChild(div);
+                });
+                modal.style.display = 'flex';
+                document.body.style.overflow = 'hidden';
+            }
+
+            function closeModal() {
+                modal.style.display = 'none';
+                document.body.style.overflow = '';
+            }
+
             closeModalBtn.addEventListener('click', closeModal);
-            modal.addEventListener('click', (e) => {
-                if (e.target === modal) closeModal();
-            });
-            
-            // Закрытие по Escape
-            document.addEventListener('keydown', (e) => {
-                if (e.key === 'Escape' && modal.style.display === 'flex') {
-                    closeModal();
-                }
-            });
+            modal.addEventListener('click', (e) => { if (e.target === modal) closeModal(); });
+            document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && modal.style.display === 'flex') closeModal(); });
 
             // === Создание панели ===
             function createFacePanel(title, items, accentColor = '#ffaa44') {
                 const div = document.createElement('div');
                 div.className = 'face-panel';
-                div.style.backgroundColor = 'rgba(20, 25, 45, 0.92)';
-                div.style.backdropFilter = 'blur(8px)';
-                div.style.borderRadius = '16px';
-                div.style.border = `2px solid ${accentColor}`;
-                div.style.boxShadow = '0 8px 20px rgba(0,0,0,0.5)';
-                div.style.padding = '12px 10px';
-                div.style.width = '220px';
-                div.style.height = '220px';
-                div.style.color = '#f0f0f0';
-                div.style.fontSize = '12px';
-                div.style.overflowY = 'auto';
-                div.style.display = 'flex';
-                div.style.flexDirection = 'column';
-                div.style.transition = 'all 0.2s ease';
-                div.style.pointerEvents = 'auto'; // Важно для кликов
+                Object.assign(div.style, {
+                    backgroundColor: 'rgba(20,25,45,0.92)',
+                    backdropFilter: 'blur(8px)',
+                    borderRadius: '16px',
+                    border: `2px solid ${accentColor}`,
+                    boxShadow: '0 8px 20px rgba(0,0,0,0.5)',
+                    padding: '12px 10px',
+                    width: '220px',
+                    height: '220px',
+                    color: '#f0f0f0',
+                    fontSize: '12px',
+                    overflowY: 'auto',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    transition: 'all 0.2s ease',
+                    // 🔥 Панель должна принимать события (при том что контейнер — нет)
+                    pointerEvents: 'auto',
+                    touchAction: 'manipulation',
+                    userSelect: 'none'
+                });
 
                 const header = document.createElement('div');
-                header.style.fontSize = '18px';
-                header.style.fontWeight = 'bold';
-                header.style.borderBottom = `2px solid ${accentColor}`;
-                header.style.marginBottom = '10px';
-                header.style.paddingBottom = '6px';
-                header.style.display = 'flex';
-                header.style.alignItems = 'center';
-                header.style.gap = '8px';
-                header.style.flexShrink = '0';
+                Object.assign(header.style, {
+                    fontSize: '18px', fontWeight: 'bold',
+                    borderBottom: `2px solid ${accentColor}`,
+                    marginBottom: '10px', paddingBottom: '6px',
+                    display: 'flex', alignItems: 'center', gap: '8px', flexShrink: '0'
+                });
                 header.innerHTML = `<span style="font-size:22px;">📌</span> ${escapeHtml(title)}`;
                 div.appendChild(header);
 
-                // Превью элементов
-                const previewItems = items.slice(0, 4);
-                previewItems.forEach(item => {
+                // Превью
+                items.slice(0, 4).forEach(item => {
                     const row = document.createElement('div');
-                    row.style.marginBottom = '8px';
-                    row.style.lineHeight = '1.3';
-                    row.style.flexShrink = '0';
+                    Object.assign(row.style, { marginBottom: '8px', lineHeight: '1.3', flexShrink: '0' });
                     if (typeof item === 'string') {
-                        const safeText = escapeHtml(item);
-                        row.innerHTML = `<span style="color:${accentColor}; font-weight:500;">•</span> ${safeText.substring(0, 50)}${safeText.length > 50 ? '…' : ''}`;
+                        const t = escapeHtml(item);
+                        row.innerHTML = `<span style="color:${accentColor};font-weight:500;">•</span> ${t.length > 50 ? t.slice(0,50)+'…' : t}`;
                     } else {
-                        const safeName = escapeHtml(item.name);
-                        const safeDesc = item.desc ? escapeHtml(item.desc) : '';
-                        const shortDesc = safeDesc.length > 45 ? safeDesc.substring(0, 45) + '…' : safeDesc;
-                        row.innerHTML = `<span style="color:${accentColor}; font-weight:600;">${safeName}</span><br><span style="font-size:10px; color:#bbbbee;">${shortDesc}</span>`;
+                        const name = escapeHtml(item.name);
+                        const desc = escapeHtml(item.desc || '');
+                        row.innerHTML = `<span style="color:${accentColor};font-weight:600;">${name}</span><br><span style="font-size:10px;color:#bbbbee;">${desc.length > 45 ? desc.slice(0,45)+'…' : desc}</span>`;
                     }
                     div.appendChild(row);
                 });
-                
-                const moreHint = document.createElement('div');
-                moreHint.style.marginTop = 'auto';
-                moreHint.style.fontSize = '10px';
-                moreHint.style.color = '#ffaa66';
-                moreHint.style.textAlign = 'center';
-                moreHint.style.paddingTop = '5px';
-                moreHint.style.flexShrink = '0';
-                moreHint.innerHTML = '▼ кликните для полного списка ▼';
-                div.appendChild(moreHint);
 
-                div.addEventListener('click', (e) => {
-                    e.stopPropagation();
-                    e.preventDefault();
-                    openModal(title, items);
-                }, { passive: false });
-                
-                // Поддержка touch для мобильных
-                div.addEventListener('touchend', (e) => {
-                    e.stopPropagation();
-                    openModal(title, items);
-                }, { passive: true });
+                const hint = document.createElement('div');
+                Object.assign(hint.style, {
+                    marginTop: 'auto', fontSize: '10px', color: '#ffaa66',
+                    textAlign: 'center', paddingTop: '5px', flexShrink: '0'
+                });
+                hint.innerHTML = '▼ кликните для полного списка ▼';
+                div.appendChild(hint);
+
+                // Обработчики кликов
+                const handleClick = (e) => { e.stopPropagation(); e.preventDefault(); openModal(title, items); };
+                div.addEventListener('click', handleClick, { passive: false });
+                div.addEventListener('touchend', handleClick, { passive: true });
 
                 return new CSS2DObject(div);
             }
 
-            // === Данные (без изменений) ===
+            // === Данные ===
             const juniorItems = [
                 { name: "🔹 Java Core / Python синтаксис", desc: "Multithreading, Collections / Asyncio, строгая типизация. Базовые алгоритмы." },
                 { name: "🔹 Git, CI/CD основы", desc: "GitHub Actions / GitLab CI, работа в команде через pull requests." },
@@ -447,78 +400,59 @@
                 { name: "✅ Карта навыков", desc: "Обновлять каждые 3 месяца, динамика требований растёт." }
             ];
 
-            // === Создание панелей ===
-            const panel1 = createFacePanel("🟢 Junior (2026)", juniorItems, "#88ff88");
-            const panel2 = createFacePanel("🔵 Middle", middleItems, "#88aaff");
-            const panel3 = createFacePanel("🔴 Senior / Lead", seniorItems, "#ff8888");
-            const panel4 = createFacePanel("🛠️ Инструменты (Java/Python)", toolsItems, "#ffaa66");
-            const panel5 = createFacePanel("🧩 Soft Skills & Тренды", softTrends, "#dd88ff");
-            const panel6 = createFacePanel("📈 Метрики & Выводы", metricsItems, "#66ffcc");
+            // === Панели ===
+            const panels = [
+                createFacePanel("🟢 Junior (2026)", juniorItems, "#88ff88"),
+                createFacePanel("🔵 Middle", middleItems, "#88aaff"),
+                createFacePanel("🔴 Senior / Lead", seniorItems, "#ff8888"),
+                createFacePanel("🛠️ Инструменты", toolsItems, "#ffaa66"),
+                createFacePanel("🧩 Soft Skills", softTrends, "#dd88ff"),
+                createFacePanel("📈 Метрики", metricsItems, "#66ffcc")
+            ];
 
             const cubeGroup = new THREE.Group();
             scene.add(cubeGroup);
 
-            const radius = 1.55;
-            panel1.position.set(0, 0, radius);
-            panel2.position.set(0, 0, -radius);
-            panel3.position.set(-radius, 0, 0);
-            panel4.position.set(radius, 0, 0);
-            panel5.position.set(0, radius, 0);
-            panel6.position.set(0, -radius, 0);
+            const r = 1.55;
+            // Позиции: +Z, -Z, -X, +X, +Y, -Y
+            panels[0].position.set(0, 0, r);
+            panels[1].position.set(0, 0, -r);
+            panels[2].position.set(-r, 0, 0);
+            panels[3].position.set(r, 0, 0);
+            panels[4].position.set(0, r, 0);
+            panels[5].position.set(0, -r, 0);
+            // Повороты для правильной ориентации текста
+            panels[1].rotation.y = Math.PI;
+            panels[2].rotation.y = -Math.PI / 2;
+            panels[3].rotation.y = Math.PI / 2;
+            panels[4].rotation.x = Math.PI / 2;
+            panels[5].rotation.x = -Math.PI / 2;
 
-            panel2.rotation.y = Math.PI;
-            panel3.rotation.y = -Math.PI / 2;
-            panel4.rotation.y = Math.PI / 2;
-            panel5.rotation.x = Math.PI / 2;
-            panel6.rotation.x = -Math.PI / 2;
-
-            cubeGroup.add(panel1, panel2, panel3, panel4, panel5, panel6);
+            panels.forEach(p => cubeGroup.add(p));
 
             // Декоративный куб
-            const boxGeometry = new THREE.BoxGeometry(2.9, 2.9, 2.9);
-            const edgesGeo = new THREE.EdgesGeometry(boxGeometry);
-            const wireframe = new THREE.LineSegments(edgesGeo, new THREE.LineBasicMaterial({ color: 0x66ccff }));
-            cubeGroup.add(wireframe);
-            
-            const ghostCube = new THREE.Mesh(boxGeometry, new THREE.MeshPhongMaterial({ 
-                color: 0x2266aa, 
-                transparent: true, 
-                opacity: 0.07, 
-                side: THREE.DoubleSide 
-            }));
-            cubeGroup.add(ghostCube);
+            const boxGeo = new THREE.BoxGeometry(2.9, 2.9, 2.9);
+            cubeGroup.add(new THREE.LineSegments(new THREE.EdgesGeometry(boxGeo), new THREE.LineBasicMaterial({ color: 0x66ccff })));
+            cubeGroup.add(new THREE.Mesh(boxGeo, new THREE.MeshPhongMaterial({ color: 0x2266aa, transparent: true, opacity: 0.07, side: THREE.DoubleSide })));
 
             // Частицы
-            const particleRingGeometry = new THREE.BufferGeometry();
-            const ringCount = 800;
+            const ringGeo = new THREE.BufferGeometry();
             const ringPos = [];
-            for (let i = 0; i < ringCount; i++) {
-                const theta = Math.random() * Math.PI * 2;
-                const phi = Math.acos(2 * Math.random() - 1);
-                const r = 2.2;
-                ringPos.push(
-                    r * Math.sin(phi) * Math.cos(theta), 
-                    r * Math.sin(phi) * Math.sin(theta), 
-                    r * Math.cos(phi)
-                );
+            for (let i = 0; i < 800; i++) {
+                const θ = Math.random() * Math.PI * 2;
+                const φ = Math.acos(2 * Math.random() - 1);
+                const rad = 2.2;
+                ringPos.push(rad * Math.sin(φ) * Math.cos(θ), rad * Math.sin(φ) * Math.sin(θ), rad * Math.cos(φ));
             }
-            particleRingGeometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array(ringPos), 3));
-            const ringParticles = new THREE.Points(particleRingGeometry, new THREE.PointsMaterial({ 
-                color: 0x77aaff, 
-                size: 0.04, 
-                transparent: true, 
-                opacity: 0.5,
-                sizeAttenuation: true 
-            }));
+            ringGeo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(ringPos), 3));
+            const ringParticles = new THREE.Points(ringGeo, new THREE.PointsMaterial({ color: 0x77aaff, size: 0.04, transparent: true, opacity: 0.5, sizeAttenuation: true }));
             scene.add(ringParticles);
 
-            // === OrbitControls (ИСПРАВЛЕНО) ===
-            const controls = new OrbitControls(camera, renderer.domElement);
+            // === OrbitControls ===
+            const controls = new OrbitControls(camera, renderer.domElement); // 🔥 Привязан к canvas, не к labelRenderer!
             controls.enableDamping = true;
-            controls.dampingFactor = 0.08;
-            controls.enableRotate = true;
-            controls.rotateSpeed = 0.9;
-            controls.enableZoom = true;
+            controls.dampingFactor = 0.05;
+            controls.rotateSpeed = 0.7;
             controls.zoomSpeed = 1.0;
             controls.minDistance = 3.5;
             controls.maxDistance = 12;
@@ -527,32 +461,26 @@
             controls.minPolarAngle = 0.2;
             controls.maxPolarAngle = Math.PI - 0.2;
             controls.target.set(0, 0, 0);
-            
-            // ИСПРАВЛЕНИЕ: используем строковые значения вместо THREE.TOUCH
-            controls.touches = {
-                ONE: 'ROTATE',
-                TWO: 'DOLLY_PAN'
-            };
+            // 🔥 Исправленные настройки тача (строки, не константы)
+            controls.touches = { ONE: 'ROTATE', TWO: 'DOLLY_PAN' };
+            controls.mouseButtons = { LEFT: THREE.MOUSE.ROTATE, MIDDLE: THREE.MOUSE.DOLLY, RIGHT: THREE.MOUSE.PAN };
 
-            // === Адаптация ===
-            window.addEventListener('resize', onWindowResize);
-            function onWindowResize() {
+            // === Resize ===
+            window.addEventListener('resize', () => {
                 camera.aspect = window.innerWidth / window.innerHeight;
                 camera.updateProjectionMatrix();
                 renderer.setSize(window.innerWidth, window.innerHeight);
                 labelRenderer.setSize(window.innerWidth, window.innerHeight);
-            }
+            });
 
             // === Анимация ===
             let time = 0;
             function animate() {
                 requestAnimationFrame(animate);
                 time += 0.008;
-                
                 ringParticles.rotation.y = time * 0.2;
                 ringParticles.rotation.x = Math.sin(time * 0.3) * 0.2;
                 stars.rotation.y += 0.0005;
-                
                 controls.update();
                 renderer.render(scene, camera);
                 labelRenderer.render(scene, camera);
