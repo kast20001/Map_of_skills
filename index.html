@@ -141,10 +141,10 @@
 <body>
     <div id="info">
         <strong>📊 3D Матрица навыков</strong> | Java • Python | <span style="color:#ffaa00;">Кликните на любую грань — детали</span><br>
-        🖱️ <em>Перетащите мышью, чтобы вращать куб</em>
+        🖱️ <em>Куб автоматически вращается, тащите мышью для управления</em>
     </div>
     <div id="controls-note">
-        🔄 ПКМ + перетаскивание — панорама | Колёсико — масштаб | 👆 Клик по панели — полная информация
+        🔄 Авто-вращение включено | ПКМ + перетаскивание — панорама | Колёсико — масштаб | 👆 Клик по панели — полная информация
     </div>
 
     <!-- Модальное окно (изначально скрыто) -->
@@ -414,6 +414,23 @@
         const ringParticles = new THREE.Points(particleRingGeometry, new THREE.PointsMaterial({ color: 0x77aaff, size: 0.03, transparent: true, opacity: 0.4 }));
         scene.add(ringParticles);
         
+        // --- Auto-rotation system ---
+        let isUserInteracting = false;
+        let autoRotationTimer = null;
+        let autoRotationActive = true;
+        
+        function resetAutoRotationTimer() {
+            isUserInteracting = true;
+            if (autoRotationTimer) clearTimeout(autoRotationTimer);
+            autoRotationTimer = setTimeout(() => {
+                isUserInteracting = false;
+            }, 3000); // Resume auto-rotation after 3 seconds of inactivity
+        }
+        
+        renderer.domElement.addEventListener('mousedown', resetAutoRotationTimer);
+        renderer.domElement.addEventListener('touchstart', resetAutoRotationTimer);
+        renderer.domElement.addEventListener('wheel', resetAutoRotationTimer, { passive: true });
+        
         // Управление
         const controls = new OrbitControls(camera, renderer.domElement);
         controls.enableDamping = true;
@@ -439,6 +456,15 @@
             ringParticles.rotation.y = time * 0.2;
             ringParticles.rotation.x = Math.sin(time * 0.3) * 0.2;
             stars.rotation.y += 0.0005;
+            
+            // Auto-rotate the cube when user is not interacting
+            if (autoRotationActive && !isUserInteracting) {
+                controls.autoRotate = true;
+                controls.autoRotateSpeed = 2;
+            } else {
+                controls.autoRotate = false;
+            }
+            
             controls.update();
             renderer.render(scene, camera);
             labelRenderer.render(scene, camera);
