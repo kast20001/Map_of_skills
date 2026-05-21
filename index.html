@@ -161,8 +161,8 @@
     <script type="importmap">
         {
             "imports": {
-                "three": "https://unpkg.com/three@0.128.0/build/three.module.js",
-                "three/addons/": "https://unpkg.com/three@0.128.0/examples/jsm/"
+                "three": "https://unpkg.com/three@r128/build/three.module.js",
+                "three/addons/": "https://unpkg.com/three@r128/examples/jsm/"
             }
         }
     </script>
@@ -188,7 +188,7 @@
         labelRenderer.domElement.style.position = 'absolute';
         labelRenderer.domElement.style.top = '0px';
         labelRenderer.domElement.style.left = '0px';
-        labelRenderer.domElement.style.pointerEvents = 'auto'; // чтобы клики по панелям работали
+        labelRenderer.domElement.style.pointerEvents = 'auto';
         document.body.appendChild(labelRenderer.domElement);
 
         // Освещение
@@ -235,7 +235,6 @@
             itemsArray.forEach(item => {
                 const div = document.createElement('div');
                 div.className = 'modal-item';
-                // item может быть объектом {name, desc} или строкой (на всякий случай)
                 if (typeof item === 'string') {
                     div.innerHTML = `<strong>📄</strong><p>${item}</p>`;
                 } else {
@@ -254,7 +253,7 @@
             if (e.target === modal) closeModal();
         });
         
-        // --- Функция создания кликабельной панели (возвращает CSS2DObject) ---
+        // --- Функция создания кликабельной панели ---
         function createFacePanel(title, items, accentColor = '#ffaa44') {
             const div = document.createElement('div');
             div.className = 'face-panel';
@@ -272,7 +271,7 @@
             div.style.display = 'flex';
             div.style.flexDirection = 'column';
             div.style.transition = 'all 0.1s';
-            // Заголовок
+            
             const header = document.createElement('div');
             header.style.fontSize = '20px';
             header.style.fontWeight = 'bold';
@@ -285,7 +284,6 @@
             header.innerHTML = `<span style="font-size:24px;">📌</span> ${title}`;
             div.appendChild(header);
             
-            // Контент (сокращённый, но при клике покажем полный)
             items.forEach(item => {
                 const row = document.createElement('div');
                 row.style.marginBottom = '10px';
@@ -293,14 +291,12 @@
                 if (typeof item === 'string') {
                     row.innerHTML = `<span style="color:${accentColor}; font-weight:500;">•</span> ${item.substring(0, 60)}${item.length > 60 ? '…' : ''}`;
                 } else {
-                    // отображаем коротко имя + первые слова описания
                     let shortDesc = item.desc ? (item.desc.length > 50 ? item.desc.substring(0, 50) + '…' : item.desc) : '';
                     row.innerHTML = `<span style="color:${accentColor}; font-weight:600;">${item.name}</span><br><span style="font-size:11px; color:#bbbbee;">${shortDesc}</span>`;
                 }
                 div.appendChild(row);
             });
             
-            // Добавляем обработчик клика для открытия модалки с полными данными
             div.addEventListener('click', (e) => {
                 e.stopPropagation();
                 openModal(title, items);
@@ -309,7 +305,7 @@
             return new CSS2DObject(div);
         }
         
-        // --- Данные для каждой грани (полные, как в курсовой) ---
+        // --- Данные для каждой грани ---
         const juniorItems = [
             { name: "🔹 Java Core / Python синтаксис", desc: "Multithreading, Collections / Asyncio, строгая типизация. Базовые алгоритмы." },
             { name: "🔹 Git, CI/CD основы", desc: "GitHub Actions / GitLab CI, работа в команде через pull requests." },
@@ -369,12 +365,12 @@
         
         // Позиционирование на гранях куба
         const radius = 1.45;
-        panel1.position.set(0, 0, radius);   // перед
-        panel2.position.set(0, 0, -radius);  // зад
-        panel3.position.set(-radius, 0, 0);  // лево
-        panel4.position.set(radius, 0, 0);   // право
-        panel5.position.set(0, radius, 0);   // верх
-        panel6.position.set(0, -radius, 0);  // низ
+        panel1.position.set(0, 0, radius);
+        panel2.position.set(0, 0, -radius);
+        panel3.position.set(-radius, 0, 0);
+        panel4.position.set(radius, 0, 0);
+        panel5.position.set(0, radius, 0);
+        panel6.position.set(0, -radius, 0);
         
         // Повороты для правильной ориентации
         panel2.rotation.y = Math.PI;
@@ -422,7 +418,6 @@
         controls.zoomSpeed = 1.2;
         controls.enableZoom = true;
         controls.enablePan = true;
-        controls.autoRotate = false;
         controls.target.set(0, 0, 0);
         
         window.addEventListener('resize', onWindowResize);
